@@ -153,7 +153,8 @@ class DockerDaemon(AgentCheck):
             self.docker_client = self.docker_util.client
             self.docker_gateway = DockerUtil.get_gateway()
 
-            self.kubeutil = KubeUtil() if Platform.is_k8s() else None
+            if Platform.is_k8s():
+                self.kubeutil = KubeUtil()
 
             # We configure the check with the right cgroup settings for this host
             # Just needs to be done once

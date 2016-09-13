@@ -38,7 +38,7 @@ class KubeUtil:
     NAMESPACE_LABEL = "io.kubernetes.pod.namespace"
 
     def __init__(self, instance=None):
-        self.docker_util = DockerUtil()
+        self.dockerutil = DockerUtil()
         if instance is None:
             try:
                 config_file_path = get_conf_path(KUBERNETES_CHECK_NAME)
@@ -194,6 +194,12 @@ class KubeUtil:
                 self._node_ip = status.get('hostIP', '')
                 self._node_name = spec.get('nodeName', '')
                 break
+
+    def are_tags_filtered(self, tags):
+        """
+        Because it is a pain to call it from the kubernetes check otherwise.
+        """
+        return self.dockerutil.are_tags_filtered(tags)
 
     @classmethod
     def get_auth_token(cls):
