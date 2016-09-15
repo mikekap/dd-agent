@@ -25,6 +25,7 @@ dist/*
 nosetests*.xml
 stats.dat
 conf.d/*.yaml
+!conf.d/docker_daemon.yaml
 !conf.d/network.yaml
 packaging/build/
 packaging/root/
