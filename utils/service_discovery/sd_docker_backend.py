@@ -66,7 +66,12 @@ class SDDockerBackend(AbstractSDBackend):
         Use the DATADOG_ID label or the image."""
         identifier = inspect.get('Config', {}).get('Labels', {}).get(DATADOG_ID) or \
             inspect.get('Config', {}).get('Image')
-        annotations = (self._get_kube_config(inspect.get('Id'), 'metadata') or {}).get('annotations') if Platform.is_k8s() else None
+
+        if Platform.is_k8s():
+            kube_metadata = self._get_kube_config(inspect.get('Id'), 'metadata', only_if_first_container=True) or {}
+            annotations = kube_metadata.get('annotations')
+        else:
+            annotations = {}
 
         return self.config_store.get_checks_to_refresh(identifier, kube_annotations=annotations)
 
@@ -223,11 +228,13 @@ class SDDockerBackend(AbstractSDBackend):
             tags.append('pod_name:%s' % pod_metadata.get('name'))
         return tags
 
-    def _get_kube_config(self, c_id, key):
+    def _get_kube_config(self, c_id, key, only_if_first_container=False):
         """Get a part of a pod config from the kubernetes API"""
         pods = self.kubeutil.retrieve_pods_list().get('items', [])
         for pod in pods:
             c_statuses = pod.get('status', {}).get('containerStatuses', [])
+            if only_if_first_container:
+                c_statuses = c_statuses[:1]
             for status in c_statuses:
                 if c_id == status.get('containerID', '').split('//')[-1]:
                     return pod.get(key, {})
@@ -282,7 +289,13 @@ class SDDockerBackend(AbstractSDBackend):
     def _get_check_configs(self, c_id, identifier, trace_config=False):
         """Retrieve configuration templates and fill them with data pulled from docker and tags."""
         inspect = self.docker_client.inspect_container(c_id)
-        annotations = (self._get_kube_config(inspect.get('Id'), 'metadata') or {}).get('annotations') if Platform.is_k8s() else None
+        if Platform.is_k8s():
+            # Get the pod annotations, but only if we are the first container. The goal is to add a check from annotations
+            # only once per kubernetes pod rather than once for each container in that pod.
+            kube_metadata = self._get_kube_config(inspect.get('Id'), 'metadata', only_if_first_container=True) or {}
+            annotations = kube_metadata.get('annotations')
+        else:
+            annotations = {}
         config_templates = self._get_config_templates(identifier, trace_config=trace_config, kube_annotations=annotations)
         if not config_templates:
             log.debug('No config template for container %s with identifier %s. '
